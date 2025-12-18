@@ -68,9 +68,10 @@
 │   ├── Tracker_Events_Webhook.json  # n8n: Обработка событий из Tracker
 │   └── YandexTracker_Daily_Digest.json  # n8n: Генерация дайджеста
 ├── config/                 # Примеры конфигов (DB_CONFIG, TOKENS)
+    ├── requirements.txt        # Зависимости Python
 │   └── env.example         # Шаблон .env для ключей
-├── screenshots/            # Скриншоты бота, дайджестов (добавьте свои)
-└── requirements.txt        # Зависимости Python
+└── screenshots/            # Скриншоты бота, дайджестов (добавьте свои)
+
 </code></pre>
 
 <h2 id="установка">Установка</h2>
