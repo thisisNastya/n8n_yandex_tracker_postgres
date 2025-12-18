@@ -1,0 +1,511 @@
+{
+  "name": "Tracker Events Webhook WORK!!!!!",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.body.status.key === \"inProgress\" &&($json.body.previousStatus.key !== \"inProgress\")}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "b631404d-9ab8-45fb-8449-b252fc585414",
+      "name": "IF: Задача взята в работу",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -4160,
+        1904
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.body.status.key === \"closed\" &&($json.body.previousStatus.key === \"inProgress\")}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "7ed3bd61-eefe-4d3f-b67c-29661df0a84f",
+      "name": "IF: Задача завершена",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -4160,
+        2128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, chat_id, name, timezone, tracker_user_id FROM users WHERE tracker_user_id = '{{ $json.body.tracker_user_id }}';",
+        "options": {}
+      },
+      "id": "4d20cdd7-b548-48c9-8f33-0fbc6a2c25bf",
+      "name": "Postgres: Найти пользователя",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        -3904,
+        1872
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "hwvrIUikD9aId72o",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "7a05cc30-e6cd-43ba-af88-8536f20ab369",
+      "name": "Set: Подготовка данных",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        -3472,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const timezone = $json.timezone;\nconst now = new Date();\nconst localTime = new Date(now.toLocaleString(\"en-US\", { timeZone: timezone }));\nconst hour = localTime.getHours();\n\nconst inWorkingHours = hour >= 7 && hour <= 21;\n\nreturn [{\n  json: {\n    ...$json,\n    send_new_task_notification: inWorkingHours\n  }\n}];"
+      },
+      "id": "95237381-8a1d-455a-9fed-33f59ce1b607",
+      "name": "Function: Проверить рабочее время (7–21)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -2720,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.send_new_task_notification }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "ddc4b1f4-6081-4fc1-a25d-7875af732c3c",
+      "name": "IF: Отправлять уведомление о новой задаче?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -2544,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE users \nSET \n  current_task_key = '{{ $('IF: Задача взята в работу').item.json.body.task_key }}', \n  daily_active = true,\n  task_assigned_at = NOW()\nWHERE tracker_user_id = '{{ $json.tracker_user_id }}';",
+        "options": {}
+      },
+      "id": "33ec2136-d069-4ac8-8c18-7d37dab585a3",
+      "name": "Postgres: Активировать daily",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        -2928,
+        1488
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "hwvrIUikD9aId72o",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Postgres: Найти пользователя').item.json.chat_id }}",
+        "text": "=Привет, {{ $('Postgres: Найти пользователя').item.json.name }}! 👋\n\nУ тебя новая задача в работе:\n<b>{{ $('Webhook Trigger1').item.json.body.task_key }}</b> — {{ $('Webhook Trigger1').item.json.body.task_summary }}\n\nС завтрашнего дня в 9:00 по твоему времени начнут приходить daily-опросы по этой задаче.\nУдачи! 🚀",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "4f43478e-0f49-444b-9ac8-178ce14c18e3",
+      "name": "Telegram: Уведомление о новой задаче",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2272,
+        1600
+      ],
+      "webhookId": "d7f8fc68-ad62-4e88-ab0f-2440badef172",
+      "credentials": {
+        "telegramApi": {
+          "id": "GBA9u3UqZQvXbrXd",
+          "name": "Assistant Daily Bot | @assistant_daily_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE users SET current_task_key = NULL, daily_active = false, task_assigned_at = NULL \nWHERE tracker_user_id = '{{ $('Postgres: Найти пользователя').item.json.tracker_user_id }}';",
+        "options": {}
+      },
+      "id": "94a889b0-ebb3-47fb-92ec-1be8e94215ab",
+      "name": "Postgres: Деактивировать daily",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        -2704,
+        1808
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "hwvrIUikD9aId72o",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('IF: Пользователь найден').item.json.chat_id }}",
+        "text": "=Поздравляю, {{ $('IF: Пользователь найден').item.json.name }}! 🎉\n\nЗадача <b>{{ $('IF: Задача завершена').item.json.body.task_key }}</b> завершена!\nОтличная работа!\n\nDaily-опросы по этой задаче остановлены.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "9cf010b2-0226-4792-9762-cece5916e64c",
+      "name": "Telegram: Уведомление о завершении",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2432,
+        1808
+      ],
+      "webhookId": "bc1bd3ba-4991-4e2b-b1e8-5a42eefdbb0c",
+      "credentials": {
+        "telegramApi": {
+          "id": "GBA9u3UqZQvXbrXd",
+          "name": "Assistant Daily Bot | @assistant_daily_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tracker-events",
+        "options": {}
+      },
+      "id": "d99b98b8-1285-45d5-b0cb-0fb2ce56ca1f",
+      "name": "Webhook Trigger1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -4384,
+        1968
+      ],
+      "webhookId": "replace_after_save"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "03e2845a-5adc-4c3b-a35c-af5dfd1dea30",
+      "name": "Respond OK1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2080,
+        1984
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ Object.keys($json).length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "57da47eb-5757-4391-8164-1f6dbe3956a2",
+      "name": "IF: Пользователь найден",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -3696,
+        1872
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$('Webhook Trigger1').item.json.body.status.key=== \"inProgress\"}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "dffe9d6d-dd1b-4039-aa98-38016b29f5d7",
+      "name": "IF: Задача взята в работу2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -3232,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$('Webhook Trigger1').item.json.body.status.key=== \"closed\"}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a3cdedad-9bb0-413d-8fea-75f7f524ed9e",
+      "name": "IF: Задача завершена2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -3120,
+        1824
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "IF: Задача взята в работу": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Найти пользователя",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Задача завершена": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Найти пользователя",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Найти пользователя": {
+      "main": [
+        [
+          {
+            "node": "IF: Пользователь найден",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Подготовка данных": {
+      "main": [
+        [
+          {
+            "node": "IF: Задача завершена2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF: Задача взята в работу2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Активировать daily": {
+      "main": [
+        [
+          {
+            "node": "Function: Проверить рабочее время (7–21)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function: Проверить рабочее время (7–21)": {
+      "main": [
+        [
+          {
+            "node": "IF: Отправлять уведомление о новой задаче?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Отправлять уведомление о новой задаче?": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Уведомление о новой задаче",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Уведомление о новой задаче": {
+      "main": [
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Деактивировать daily": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Уведомление о завершении",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Уведомление о завершении": {
+      "main": [
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger1": {
+      "main": [
+        [
+          {
+            "node": "IF: Задача взята в работу",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF: Задача завершена",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Пользователь найден": {
+      "main": [
+        [
+          {
+            "node": "Set: Подготовка данных",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Задача взята в работу2": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Активировать daily",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Задача завершена2": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Деактивировать daily",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e86404a3-748c-44c3-9b27-9ed8919a177f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4335b01868eb37f935a786299dedc4e5da652ac2583b1ec0f3aaeb003d539169"
+  },
+  "id": "lXtT6zfuMuRbWZNs",
+  "tags": []
+}

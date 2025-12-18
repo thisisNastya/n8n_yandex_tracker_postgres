@@ -1,0 +1,469 @@
+{
+  "name": "YandexTracker + Daily Digest (с реальными данными БД)",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.user_role }}",
+              "operation": "contains",
+              "value2": "Team Lead"
+            },
+            {
+              "value1": "={{ $json.body.user_role }}",
+              "operation": "contains",
+              "value2": "PM"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "7e3f8a79-42de-4ad7-986d-c25e9d923e8d",
+      "name": "Это TL или PM?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        2128
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram запрос /digest').item.json.message.from.id }}",
+        "text": "Данная функция не поддерживается на вашем аккаунте",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3504,
+        2256
+      ],
+      "id": "30a8a7a4-2d59-46c6-aa97-7094b245454c",
+      "name": "Send a text message1",
+      "webhookId": "61e96e0d-0cdf-49bf-a20b-bf5289baf71f",
+      "credentials": {
+        "telegramApi": {
+          "id": "GBA9u3UqZQvXbrXd",
+          "name": "Assistant Daily Bot | @assistant_daily_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "==Ты — ИИ-ассистент scrum-команды. Проанализируй прогресс по задаче в разработке на основе daily-отчётов разработчика. Учитывай контекст спринта: общий прогресс, риски срыва сроков, загрузку команды.\n\nДанные по задаче:\nКлюч задачи: {{ $json.taskKey }}\nИсполнитель: {{ $json.assignees[0].name }} ({{ $json.assignees[0].email }})\n\nИстория daily (последние записи, от новых к старым):\n{{ JSON.stringify($json.dailyHistory.slice(0, 7), null, 2) }}\n\nВыполни анализ:\n1. Кратко опиши, что было сделано вчера и что планируется сегодня.\n2. Оцени прогресс задачи в процентах (0–100%). Учитывай:\n   - Что уже сделано по daily-отчётам\n   - Сложность типичной задачи (настройка доступа, подключение БД — обычно быстро; сложные фичи — медленнее)\n   - Наличие блокеров (снижают оценку)\n   - Общий темп работы и дедлайны спринта\n3. Выдели блокеры: есть ли, насколько критичны (низкая/средняя/высокая), влияние на спринт.\n4. Дай рекомендации: что уточнить у разработчика, нужно ли эскалировать тимлиду/PM.\n\nВыведи строго в Markdown, коротко (1–2 минуты чтения). Используй следующий формат:\n\n{{ $json.taskKey }} ({{ $json.assignees[0].name }})\n- **Прогресс**: [кратко: что сделано вчера → что сегодня]\n- **Оценка выполнения**: **XX%** (обоснование: [почему именно столько, влияние на спринт])\n- **Блокеры**: [нет / есть: краткое описание + критичность]\n- **Рекомендации**: [конкретные действия или \"всё ок, продолжаем\"; если критичность высокая — предложи эскалацию]\n\nНе используй никаких дополнительных заголовков, отступов или нумерации вне этого формата.",
+        "options": {
+          "systemMessage": "",
+          "maxIterations": 8,
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        4224,
+        2080
+      ],
+      "id": "06855173-f319-4969-91ea-1b76721c59be",
+      "name": "AI Agent1",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "alwaysOutputData": false,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"Webhook\"].json.body.chat_id }}",
+        "text": "={{ $node[\"Format Report (Function)\"].json.report }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "5aff67fd-c5a2-419b-b144-e6cc1c939fde",
+      "name": "Send Digest to Team1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        5280,
+        1952
+      ],
+      "webhookId": "3e7fd052-cd53-4359-9ccd-522e3fa1218e",
+      "credentials": {
+        "telegramApi": {
+          "id": "GBA9u3UqZQvXbrXd",
+          "name": "Assistant Daily Bot | @assistant_daily_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $node[\"Format Report (Function)\"].json.report.includes('(риск)') }}"
+            }
+          ]
+        }
+      },
+      "id": "22735a29-6649-45b7-881d-73b1a564ee24",
+      "name": "If Blockers Found1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        4976,
+        1984
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"Webhook\"].json.body.chat_id }}",
+        "text": "🚨 Блокеры в спринте!\\n\\n{{ $node[\"Format Report (Function)\"].json.report }}",
+        "additionalFields": {}
+      },
+      "id": "52b8a671-566b-4028-b4ee-475bdc9f3b65",
+      "name": "Escalate to Team Lead1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        5280,
+        2176
+      ],
+      "webhookId": "e983562d-38ed-44f1-a72b-3a1d12924d3d",
+      "credentials": {
+        "telegramApi": {
+          "id": "GBA9u3UqZQvXbrXd",
+          "name": "Assistant Daily Bot | @assistant_daily_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "d47fe292-a8f4-4147-9ebc-5ea1cf2e4857",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        3104,
+        2128
+      ],
+      "id": "b991ff5a-f14a-436e-9943-888530d9bb4f",
+      "name": "Webhook",
+      "webhookId": "d47fe292-a8f4-4147-9ebc-5ea1cf2e4857"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tracker.yandex.net/v3/issues/_search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.iamToken }}"
+            },
+            {
+              "name": "X-Cloud-Org-ID",
+              "value": "ваш id организации"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d3e141e8-7b66-48da-b76c-4b352172b658",
+      "name": "Sprint Stats HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3680,
+        1888
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// items — массив задач из HTTP Request\nconst tasks = items.map(item => item.json);\n\nif (tasks.length === 0) {\n  return [{\n    json: {\n      totalTasks: 0,\n      compl_inprogresTasks: 0,\n      completedTasks: 0,\n      inProgress: 0,\n      openTasks: 0,\n      progressPercent: 0\n    }\n  }];\n}\n\nconst totalTasks = tasks.length;\n\nlet completedTasks = 0;\nlet inProgress = 0;\nlet openTasks = 0;\n\nconst assignees = new Set();\n\ntasks.forEach(task => {\n  const statusId = task.statusType?.id?.toLowerCase();\n\n  if (statusId === 'done') {\n    completedTasks++;\n  }\n  else if (statusId === 'inprogress') {\n    inProgress++;\n  }\n  else if (statusId === 'new') {\n    openTasks++;\n  }\n\n  if (task.assignee?.id) {\n    assignees.add(task.assignee.id);\n  }\n});\n\n// Рассчитываем compl_inprogresTasks как сумму inProgress и openTasks\nconst compl_inprogresTasks = inProgress + openTasks;\n\n// Дополнительно можно рассчитать процент прогресса, если нужно\nconst progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;\n\nreturn [{\n  json: {\n    totalTasks,\n    compl_inprogresTasks,\n    completedTasks,\n    inProgress,\n    openTasks,\n    progressPercent\n  }\n}];"
+      },
+      "id": "884c5f6d-b5ee-45c7-867c-88f9c4461fae",
+      "name": "Calculate Sprint Stats",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        3888,
+        1888
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://iam.api.cloud.yandex.net/iam/v1/tokens",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "yandexPassportOauthToken",
+              "value": "ваш id приложения яндекс"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Auth Yandex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        3504,
+        1888
+      ],
+      "id": "4d73e4c3-248b-41f1-aafe-9594ee4dbc47"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    c.id AS checkin_id,\n    c.user_id,\n    c.checkin_date,\n    c.answer_yesterday,\n    c.answer_today,\n    c.answer_blockers,\n    c.task_id,\n\n    u.id AS user_id,\n    u.chat_id,\n    u.name,\n    u.is_daily_participant,\n    u.email,\n    u.tracker_user_id,\n    u.current_task_key,\n    u.daily_active\nFROM public.checkins c\nJOIN public.users u\n    ON c.user_id = u.id\nWHERE u.daily_active = true;\n",
+        "options": {}
+      },
+      "name": "Данные о daily из БД1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        3616,
+        2112
+      ],
+      "id": "bf6a7c1d-e1f5-4212-abd1-3c2b64e131c5",
+      "credentials": {
+        "postgres": {
+          "id": "hwvrIUikD9aId72o",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-r1-0528:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        4192,
+        2304
+      ],
+      "id": "eca06034-3509-45ab-bd0e-3981345b7fbd",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "MstKlLVXE7R5Vn5L",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Вход: массив items из Postgres (каждый — один check-in)\n\n// Группируем по task_id (или current_task_key)\nconst tasksMap = {};\n\nitems.forEach(item => {\n  const data = item.json;\n  const taskKey = data.task_id || data.current_task_key || 'UNKNOWN';\n\n  if (!tasksMap[taskKey]) {\n    tasksMap[taskKey] = {\n      taskKey: taskKey,\n      assignees: new Set(),\n      dailyHistory: []\n    };\n  }\n\n  // Добавляем исполнителя (может быть несколько, но редко)\n  if (data.name && data.email) {\n    tasksMap[taskKey].assignees.add(JSON.stringify({\n      name: data.name,\n      email: data.email\n    }));\n  }\n\n  // Форматируем дату красиво\n  const dateStr = data.checkin_date \n    ? new Date(data.checkin_date).toLocaleDateString('ru-RU')\n    : 'Неизвестно';\n\n  // Добавляем запись в историю\n  tasksMap[taskKey].dailyHistory.push({\n    date: dateStr,\n    yesterday: data.answer_yesterday || '—',\n    today: data.answer_today || '—',\n    blockers: data.answer_blockers || 'Нет блокеров'\n  });\n});\n\n// Преобразуем Set ассignees в массив\nObject.values(tasksMap).forEach(task => {\n  task.assignees = Array.from(task.assignees).map(str => JSON.parse(str));\n  // Сортируем историю по дате (новые сверху)\n  task.dailyHistory.sort((a, b) => {\n    const da = new Date(a.date.split('.').reverse().join('-'));\n    const db = new Date(b.date.split('.').reverse().join('-'));\n    return db - da;\n  });\n});\n\n// Выводим массив объектов — по одному на задачу\nreturn Object.values(tasksMap).map(task => ({\n  json: task\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3856,
+        2112
+      ],
+      "id": "1025f706-97d5-4486-8c60-4aaf116b3034",
+      "name": "Все daily опросы по текущим задачам"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Если нет данных\nif (items.length === 0) {\n  return [{ json: { report: \"Нет данных за сегодня.\" } }];\n}\n\n// Статистика — первый item\nlet statsItem = items[0].json;\nlet aiItems = items.slice(1); // отчёты ИИ\n\nlet stats = {\n  totalTasks: 0,\n  completedTasks: 0,\n  inProgress: 0,\n  openTasks: 0,\n  totalMembers: 'Неизвестно',\n  progressPercent: 0,\n  compl_inprogresTasks: 0  // новый параметр\n};\n\nif (typeof statsItem.totalTasks === 'number') {\n  stats = {\n    totalTasks: statsItem.totalTasks || 0,\n    completedTasks: statsItem.completedTasks || 0,\n    inProgress: statsItem.inProgress || 0,\n    openTasks: statsItem.openTasks || 0,\n    totalMembers: statsItem.totalMembers || 'Неизвестно',\n    progressPercent: statsItem.totalTasks > 0 \n      ? Math.round((statsItem.completedTasks / statsItem.totalTasks) * 100)\n      : 0,\n    compl_inprogresTasks: (statsItem.openTasks || 0) + (statsItem.inProgress || 0)  // сумма открытых + в работе\n  };\n}\n\n// Собираем отчёты от ИИ\nconst taskReports = aiItems\n  .map(item => {\n    const output = item.json.output || item.json.text || \"\";\n    if (!output.trim()) return null;\n\n    const keyMatch = output.match(/###\\s+([A-Z]+-\\d+)/);\n    const taskKey = keyMatch ? keyMatch[1] : 'UNKNOWN';\n\n    const percentMatch = output.match(/\\*\\*Оценка выполнения\\*\\*:\\s*\\*\\*(\\d+)%\\*\\*/);\n    const percent = percentMatch ? percentMatch[1] : '?';\n\n    const modifiedOutput = output.replace(\n      /###\\s+[A-Z]+-\\d+/,\n      `### ${taskKey} — ${percent}% выполнено`\n    );\n\n    return modifiedOutput.trim();\n  })\n  .filter(Boolean)\n  .join(\"\\n\\n---\\n\\n\");\n\nconst reportsSection = taskReports || \"_Нет отчётов по задачам в работе_\";\n\n// Блокеры\nconst allBlockers = [];\naiItems.forEach(item => {\n  const text = (item.json.output || item.json.text || \"\");\n  const lines = text.split('\\n');\n  lines.forEach(line => {\n    if (line.toLowerCase().includes('блокер') && line.includes(':')) {\n      allBlockers.push(line.trim());\n    }\n  });\n});\n\nconst risksSection = allBlockers.length > 0\n  ? `Общие риски и блокеры\\n${allBlockers.map(b => `- ${b}`).join('\\n')}\\n`\n  : 'Общие риски и блокеры\\nКритичных блокеров не выявлено.';\n\nconst fullReport = `Аналитический дайджест по задачам\n\n**Дата:** ${new Date().toLocaleDateString('ru-RU')}\n**Задач в работе:** ${stats.inProgress} из ${stats.compl_inprogresTasks}\n\nОбщая статистика спринта\n- Всего задач на этой неделе: **${stats.totalTasks}**\n- Выполнено: **${stats.completedTasks}** (${stats.progressPercent}%)\n- В работе: **${stats.inProgress}**\n- Новые/открытые: **${stats.openTasks}**\n- Незавершённых всего: **${stats.compl_inprogresTasks}**\n\n${risksSection}\n\nПрогресс по задачам\n\n${reportsSection}\n\n---\nПодготовлено ИИ-ассистентом.`;\n\nreturn [{ json: { report: fullReport } }];"
+      },
+      "id": "89974992-0f7a-4af3-acb0-6b0e0275f6ed",
+      "name": "Format Report (Function)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        4768,
+        1984
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4544,
+        1984
+      ],
+      "id": "4ef82300-f159-41b1-98c5-d1f79404be42",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Это TL или PM?1": {
+      "main": [
+        [
+          {
+            "node": "Auth Yandex",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Данные о daily из БД1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Blockers Found1": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Team Lead1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Digest to Team1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Это TL или PM?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sprint Stats HTTP": {
+      "main": [
+        [
+          {
+            "node": "Calculate Sprint Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Yandex": {
+      "main": [
+        [
+          {
+            "node": "Sprint Stats HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Sprint Stats": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Данные о daily из БД1": {
+      "main": [
+        [
+          {
+            "node": "Все daily опросы по текущим задачам",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Все daily опросы по текущим задачам": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report (Function)": {
+      "main": [
+        [
+          {
+            "node": "If Blockers Found1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Format Report (Function)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ed46fe75-898e-4966-9684-c271ff1697ab",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4335b01868eb37f935a786299dedc4e5da652ac2583b1ec0f3aaeb003d539169"
+  },
+  "id": "XkbRNY98WTWR5iJo",
+  "tags": []
+}
