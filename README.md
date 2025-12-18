@@ -63,13 +63,10 @@
 <h2 id="структура-репозитория">Структура репозитория</h2>
 
 <pre><code>├── README.md               # Это файл
-├── tg_bot_ai_3_good_role_yt.py  # Основной код Telegram-бота
+├── tg_bot_ai.py  # Основной код Telegram-бота
 ├── n8n_workflows/
 │   ├── Tracker_Events_Webhook.json  # n8n: Обработка событий из Tracker
 │   └── YandexTracker_Daily_Digest.json  # n8n: Генерация дайджеста
-├── docs/
-│   ├── К2_НейроТех_Ассистент_руководителя_разработки.pdf  # Описание кейса
-│   └── Презентация_черновик.pptx  # Черновик презентации
 ├── config/                 # Примеры конфигов (DB_CONFIG, TOKENS)
 │   └── env.example         # Шаблон .env для ключей
 ├── screenshots/            # Скриншоты бота, дайджестов (добавьте свои)
