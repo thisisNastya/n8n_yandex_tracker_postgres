@@ -1,0 +1,5 @@
+pyTelegramBotAPI
+psycopg2
+apscheduler
+pytz
+requests
