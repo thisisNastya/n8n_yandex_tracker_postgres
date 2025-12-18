@@ -142,7 +142,6 @@ OAUTH_TOKEN=your_yandex_oauth_token
 <h2 id="контакты">Контакты</h2>
 
 <ul>
-<li>Автор: [Калинина А] (email@example.com)</li>
 <li>Кейс: K2 НейроТех AI Boostcamp, 2025.</li>
 </ul>
 
