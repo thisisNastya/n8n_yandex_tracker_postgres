@@ -15,17 +15,17 @@ import json
 
 # ==================== НАСТРОЙКИ ====================
 
-TRACKER_ORG_ID = "bpf2qpu7qte0m2fj8n1o"  # твой X-Cloud-Org-ID
+TRACKER_ORG_ID = "bpf2qp........"  # твой X-Cloud-Org-ID
 IAM_TOKEN = None  # будем получать свежий при каждом запросе
 IAM_TOKEN_EXPIRES = 0
 
-TELEGRAM_TOKEN = '8027083575:AAGegJ5jk1gUjeL21b43BJ3DaJfmE32HiCI'
+TELEGRAM_TOKEN = '8027083575:AAGeg...........'
 
 DB_CONFIG = {
     "dbname": "default_db",
     "user": "gen_user",
-    "password": "Uj>SX0QCw71:Ic",
-    "host": "194.87.226.165",
+    "password": ".........",
+    "host": ".............",
     "port": "5432"
 }
 
@@ -48,7 +48,7 @@ def get_iam_token():
     url = "https://iam.api.cloud.yandex.net/iam/v1/tokens"
     headers = {"Content-Type": "application/json"}
     data = {
-        "yandexPassportOauthToken": "y0__xD6oZKUBhjHqDwg_9yB1RWKs8qw32o9-XqFOnqvnscwuyfbqQ"  # твой OAuth-токен
+        "yandexPassportOauthToken": "y0__xD6o................................."  # твой OAuth-токен
     }
     
     try:
@@ -2085,4 +2085,5 @@ if __name__ == '__main__':
             bot.infinity_polling(none_stop=True, interval=3)
         except Exception as e:
             logging.error(f"Ошибка polling: {e}")
+
             time.sleep(15)
