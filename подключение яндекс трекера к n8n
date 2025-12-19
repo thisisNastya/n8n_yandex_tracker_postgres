@@ -1,0 +1,66 @@
+Установка N8N
+- Self-hosted версия: Вы можете установить self-hosted версию на свой сервер, используя документацию: https://github.com/n8n-io/self-hosted-ai-starter-kit
+
+- Облачная версия: Вы можете купить облачную версию на официальном сайте (цена от $24): [n8n.io](https://n8n.io/).
+Интеграция Яндекс трекера и N8N: Пошаговый процесс
+1. Создание и настройка шаблона
+В N8N нет готовой интеграции для Яндекс трекера, поэтому вся реализация выполнялась на основе HTTP запросов. В моем коде для примера реализовано подключение к яднекс трекеру, получение всех данных о задачах (кто создал задачу, когда, кому передал в исполнение, и тому подобное)
+Вам нужно лишь настроить следующие вещи: вебхук, авторизация в API трекере и Open Router (или другую ИИ)  и самое главное - промпт для ИИ агента (расписать кто он, что ему надо сделать, какие данные брать и так далее).
+2. Настройка авторизации
+OAuth токен API трекера.
+- OAuth-токен - получите его по инструкции: https://yandex.cloud/ru/docs/iam/operations/iam-token/create)
+Идентификатор организации - получите его, перейдя в Трекере на страницу Администрирование → Организации (https://tracker.yandex.ru/admin/orgs) (поле идентификатор)
+И добавьте токен в N8N в ноду AuthYandexTracker (в поиске n8n забейте ноду HTTP Request).
+Method: POST
+URL: https://iam.api.cloud.yandex.net/iam/v1/tokens
+Authentication-None
+Send Query Parameters - OFF
+Send Headers - OFF
+Send Body - ON
+Body Content Type- JSON
+Specify Body- Using Fields Below
+Body Parameters:
+Name: yandexPassportOauthToken
+Value:  y0__xD6oZKUBhjH.....- ваш OAuth-токен
+
+А также добавьте идентификатор организации во все HTTP запросы которые будете добавлять.
+
+Method: POST
+URL: https://api.tracker.yandex.net/v3/issues/_search
+Authentication-None
+Send Query Parameters - OFF
+Send Headers- ON
+Specify Headers: Using Fields Below
+Header Parameters:
+Name: Authorization
+Value: Bearer {{ $json.iamToken }} - тут указываем ссылкой на ваш OAuth-токен который находится в другой ноде
+ и еще
+Name: X-Cloud-Org-ID
+Value: bpf2qpu......  - Идентификатор организации
+
+3. Настройка вебхука и триггеров
+Настройте триггер на стороне Трекера: перейдите в очередь, справа в углу настройки очереди → Автоматизация и нажмите Создать триггер.
+Настройте условия, подходящие под ваши задачи.
+В разделе Выполнить действие выберите HTTP запрос. И используйте шаблон запроса:
+
+Метод: POST
+Адрес: https://k2neurotech.app.n8n.cloud/webhook/tracker-events - тут ставить url вашего вебхука из n8n
+Способ авторизации: NoAuth
+Тип содержимого: application/json
+Тело запроса:
+{
+  "task_key": "{{issue.key}}",
+  "task_summary": "{{issue.summary}}",
+  "status": {
+    "key": "{{issue.status.key}}"
+  },
+  "previousStatus": {
+    "key": "{{issue.previousStatus.key}}"
+  },
+  "tracker_user_id": "{{issue.assignee.uid}}"
+}
+Заголовки: 
+Навзание заголовка: Content-Type
+Добавить значение: application/json
+
+Вот и все, а дальше полученнные данные можете давать через новую ноду которая формирует вид данных и отправлять в ИИ агента.
