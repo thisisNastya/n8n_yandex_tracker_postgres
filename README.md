@@ -70,6 +70,7 @@
 ├── config/                 # Примеры конфигов (DB_CONFIG, TOKENS)
     ├── requirements.txt        # Зависимости Python
 │   └── env.example         # Шаблон .env для ключей
+├── n8n_workflows/           # sqL запрос в Postgre SQL для создания таблиц
 └── screenshots/            # Скриншоты бота, дайджестов (добавьте свои)
 
 </code></pre>
